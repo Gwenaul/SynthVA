@@ -1,0 +1,1 @@
+/Library/Developer/CommandLineTools/usr/bin/c++ -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/qmidiin.dir/tests/qmidiin.cpp.o -o tests/qmidiin  -Wl,-rpath,/Users/gwen/Documents/wsp/SynthVA/rtmidi-master/build librtmidi.7.0.0.dylib

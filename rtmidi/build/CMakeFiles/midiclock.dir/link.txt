@@ -1,0 +1,1 @@
+/Library/Developer/CommandLineTools/usr/bin/c++ -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/midiclock.dir/tests/midiclock.cpp.o -o tests/midiclock  -Wl,-rpath,/Users/gwen/Documents/wsp/SynthVA/rtmidi-master/build librtmidi.7.0.0.dylib
