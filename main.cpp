@@ -20,9 +20,14 @@
 #include "MidiHandler.h"
 #include <memory>
 #include <thread>
+#include "MidiLooper.h"
 
+// Définition globale de midiLooper
+// C'est la seule définition de cette variable dans tout le programme
+MidiLooper midiLooper;
 
 void midiCallback(double deltatime, std::vector<unsigned char> *message, void *userData);
+void setupMidiLooper(SynthState* state);
 
 int main() {
     float sampleRate = 44100.0f;
@@ -41,11 +46,10 @@ int main() {
     MoogFilter moogFilter(sampleRate);
     moogFilter.setCutoff(1000.0f);
     moogFilter.setResonance(0.7f);
-
     
     // Créer un objet global ou local selon l'architecture
     RtMidiIn* midiin = new RtMidiIn();
-
+    
     try {
         midiin->openPort(1);  // 0 = premier périphérique MIDI détecté
         midiin->setCallback(&midiCallback, &state); // `state` est un pointeur vers le SynthState
@@ -54,6 +58,8 @@ int main() {
         error.printMessage();
         exit(EXIT_FAILURE);
     }
+
+    setupMidiLooper(&state);
 
     // Affectation dans le state
     state.osc = &osc;
@@ -106,9 +112,9 @@ int main() {
         return 1;
     }
 
-    SDL_Window* window = SDL_CreateWindow("Synth Visual", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 400, 200, 0);
+    SDL_Window* window = SDL_CreateWindow("Synth Visual", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 920, 480, 0);
     SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
-    TTF_Font* font = TTF_OpenFont("/Library/Fonts/Arial.ttf", 20); // S'assurer que ce chemin est correct
+    TTF_Font* font = TTF_OpenFont("/Library/Fonts/FiraCode-Regular.ttf", 16);
 
     if (!font) {
         std::cerr << "Failed to load font: " << TTF_GetError() << std::endl;
@@ -124,6 +130,8 @@ int main() {
         while (SDL_PollEvent(&event)) {
             handleKeyboard(state, event, quit);
         }
+        // Mettre à jour le looper - c'est la seule instance de MidiLooper qui existe
+        midiLooper.update();
         renderUI(renderer, font, state);
         SDL_Delay(16); // ~60 FPS
     }

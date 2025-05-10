@@ -2,7 +2,7 @@
 CXX = g++
 CXXFLAGS = -std=c++14 -O2
 TARGET = synth
-SRC = main.cpp ADSR.cpp KeyMapping.cpp KeyboardHandler.cpp AudioCallbackHandler.cpp MidiHandler.cpp Voice.cpp
+SRC = main.cpp ADSR.cpp KeyMapping.cpp KeyboardHandler.cpp AudioCallbackHandler.cpp MidiHandler.cpp Voice.cpp MidiLooper.cpp
 
 # RtMidi (dylib)
 RTMIDI_DIR = ./rtmidi

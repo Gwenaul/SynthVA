@@ -19,7 +19,7 @@ struct SynthState {
     PolyBLEP_Triangle* oscTriangle;
     NoiseOscillator* noiseOsc;
 
-    const int maxVoices = 8;
+    const int maxVoices = 6;
     std::vector<Voice> voices;
 
     Waveform* waveform = nullptr;
@@ -43,6 +43,8 @@ struct SynthState {
 
     // Filtre
     MoogFilter moogFilter;
+    float currentCutoff = 1000.0f;  // Valeur par défaut de cutoff
+    float currentResonance = 0.5f;  // Valeur par défaut de résonance
 
     // Mix des oscillateurs
     float mixSaw = 1.0f;
@@ -56,6 +58,14 @@ struct SynthState {
     LFO lfo;
     bool lfoEnabled = false;
 
+    //WaveformRenderer
+    static constexpr int WaveformBufferSize = 2048;
+    float renderBuffer[WaveformBufferSize] = {0.0f};
+    int renderBufferIndex = 0;
+
+    float renderBuffers[6][WaveformBufferSize] = {{0.0f}}; // un buffer par voix
+    int renderBufferIndices[6] = {0}; // un index par voix
+        
     // Constructeur
     SynthState(float sampleRate)
         : sampleRate(sampleRate), env(sampleRate), moogFilter(sampleRate), lfo(sampleRate)
@@ -74,6 +84,7 @@ struct SynthState {
             }
         }
     }
+
 };
 
 #endif // SYNTHSTATE_H

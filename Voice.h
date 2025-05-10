@@ -6,6 +6,7 @@
 #include "PolyBLEP_Triangle.h"
 #include "NoiseOscillator.h"
 #include "ADSR.h"
+#include "MoogFilter.h"
 
 class Voice {
 public:
@@ -17,6 +18,9 @@ public:
     void noteOff();
     bool isActive() const;
 
+    // Ajout du filtre Moog par voix
+    MoogFilter moogFilter;
+    
 // private:
     PolyBLEP_Saw osc;
     PolyBLEP_Square oscSquare;
@@ -26,6 +30,8 @@ public:
 
     bool active;
     float freq;
+
+    void setNoiseType(NoiseOscillator::NoiseType type);
 };
 
 #endif // VOICE_H

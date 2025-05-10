@@ -2,13 +2,14 @@
 
 Voice::Voice(float sampleRate)
     : osc(sampleRate), oscSquare(sampleRate), oscTriangle(sampleRate), noiseOsc(sampleRate), env(sampleRate),
-      active(false), freq(0.0f) {}
+      moogFilter(sampleRate), active(false), freq(0.0f) {}
 
 void Voice::setFrequency(float frequency) {
     freq = frequency;
 }
 
 void Voice::noteOn() {
+
     env.noteOn();
     active = true;
 }
@@ -35,4 +36,10 @@ float Voice::process(float mixSaw, float mixSquare, float mixTriangle, float mix
 
     return output;
 }
+
+void Voice::setNoiseType(NoiseOscillator::NoiseType type) {
+noiseOsc.setNoiseType(type);
+}
+
+
 

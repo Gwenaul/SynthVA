@@ -1,4 +1,3 @@
-// PolyBLEP_Saw.h
 #pragma once
 #include <cmath>
 
@@ -10,11 +9,18 @@ public:
 
     PolyBLEP_Saw(float sr) : sampleRate(sr) {}
 
+    // Fonction PolyBLEP améliorée
     float poly_blep(float t) {
-        if (t < 0.0f) return 0.0f;
-        if (t < 1.0f) {
-            float dt = t;
-            return dt - (dt * dt / 2.0f);
+        if (t < 0.0f || t >= 1.0f) return 0.0f;  // Retour à zéro pour éviter les artefacts
+        float dt = sampleRate / freq;
+        float dt2 = dt * dt;
+        if (t < dt) {
+            // Transition au début de la période
+            return t / dt - (t * t) / (2.0f * dt2);
+        } else if (t > 1.0f - dt) {
+            // Transition à la fin de la période
+            float dt2 = dt * dt;
+            return (1.0f - t) / dt - ((1.0f - t) * (1.0f - t)) / (2.0f * dt2);
         }
         return 0.0f;
     }
@@ -24,14 +30,20 @@ public:
         phase += dt;
         if (phase >= 1.0f) phase -= 1.0f;
 
+        // Calcul de la dent de scie
         float value = 2.0f * phase - 1.0f;
-        value -= poly_blep(phase / dt);
+
+        // Application de la correction PolyBLEP
+        value -= poly_blep(phase);
 
         return value;
+    }
+
+    void resetPhase() {
+        phase = 0.0f; // Réinitialisation de la phase à chaque note
     }
 
     void setFrequency(float newFreq) {
         freq = newFreq;
     }
-
 };

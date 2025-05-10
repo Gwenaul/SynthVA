@@ -16,6 +16,10 @@ void ADSR::calculateRates() {
     attackRate = 1.0f / (safeAttackTime * sampleRate);
     decayRate = (1.0f - sustainLevel) / (safeDecayTime * sampleRate);
     releaseRate = sustainLevel / (safeReleaseTime * sampleRate);
+
+    float safeAntiClickTime = std::max(0.0001f, antiClickTime);  // 100 µs minimum
+    antiClickRate = antiClickTarget / (safeAntiClickTime * sampleRate);
+
 }
 
 void ADSR::setAttack(float value) {
@@ -47,16 +51,28 @@ void ADSR::setRelease(float value) {
 }
 
 void ADSR::noteOn() {
+    antiClickTarget = 0.001f;  // ou un niveau initial très faible
+    value = 0.0f;
+    // state = ANTI_CLICK_IN;
     state = ATTACK;
-    value = 0.0f; // Repart de zéro !
 }
 
+
 void ADSR::noteOff() {
+    value = std::max(value, 0.001f);  // éviter release depuis zéro
     state = RELEASE;
 }
 
+
 float ADSR::process() {
     switch (state) {
+        // case ANTI_CLICK_IN:
+        //     value += antiClickRate;
+        //     if (value >= antiClickTarget) {
+        //         value = antiClickTarget;
+        //         state = ATTACK;
+        //     }
+        //     break;
         case ATTACK:
             value += attackRate;
             if (value >= 1.0f) {
@@ -72,7 +88,7 @@ float ADSR::process() {
             }
             break;
         case SUSTAIN:
-            // rien à faire
+            // Rien
             break;
         case RELEASE:
             value -= releaseRate;
@@ -87,6 +103,7 @@ float ADSR::process() {
     }
     return value;
 }
+
 
 bool ADSR::isActive() const {
     return state != IDLE;

@@ -30,61 +30,64 @@ int AudioCallbackHandler::audioCallback(const void *inputBuffer, void *outputBuf
 
         // Calculer une seule fois la valeur LFO par échantillon
         float lfoValue = state->lfoEnabled ? state->lfo.process() : 0.0f;
+        //pour compter les voix actives dans la boucle suivante
+        int activeVoices = 0;
 
+        float filtered = 0.0f;
+
+        int voiceIndex = 0;
+        
         for (auto& voice : state->voices) {
             if (voice.active) {
-                // Seulement traiter cette voix si elle est active
                 if (voice.env.isActive()) {
                     float baseFreq = voice.freq;
                     float modulatedFreq = baseFreq;
-                    
-                    // Appliquer la modulation LFO à la fréquence
+
                     if (state->lfoEnabled) {
                         modulatedFreq += state->lfoDepth * lfoValue;
                     }
 
-                    // Appliquer la fréquence modulée à chaque oscillateur
                     voice.osc.setFrequency(modulatedFreq);
                     voice.oscSquare.setFrequency(modulatedFreq);
                     voice.oscTriangle.setFrequency(modulatedFreq);
 
-                    // Générer le mix d'oscillateurs
-                    float oscMix = 0.0f;
-                    oscMix += state->mixSaw     * voice.osc.process();
-                    oscMix += state->mixSquare  * voice.oscSquare.process();
-                    oscMix += state->mixTriangle* voice.oscTriangle.process();
-                    oscMix += state->mixNoise   * voice.noiseOsc.process();
+                    voice.moogFilter.setCutoff(state->currentCutoff);
+                    voice.moogFilter.setResonance(state->currentResonance);
 
-                    // Appliquer l'enveloppe ADSR au signal
+                    float oscMix = 0.0f;
+                    oscMix += state->mixSaw      * voice.osc.process();
+                    oscMix += state->mixSquare   * voice.oscSquare.process();
+                    oscMix += state->mixTriangle * voice.oscTriangle.process();
+                    oscMix += state->mixNoise    * voice.noiseOsc.process();
+
                     float envValue = voice.env.process();
-                    
-                    // Éviter les artefacts si l'enveloppe est très faible
+
                     if (envValue > 0.0001f) {
-                        // Appliquer l'enveloppe au signal
                         float enveloped = oscMix * envValue;
-                        
-                        // Filtrer le signal
-                        float filtered = state->moogFilter.process(enveloped);
-                        
-                        // Ajouter au mix final
-                        mix += filtered;
+                        float filtered = voice.moogFilter.process(enveloped);
+
+                        mix += filtered * 0.05f;
+
+                        // Écriture correcte dans le buffer circulaire pour CETTE voix
+                        state->renderBuffers[voiceIndex][state->renderBufferIndices[voiceIndex]] = filtered;
+                        state->renderBufferIndices[voiceIndex] = (state->renderBufferIndices[voiceIndex] + 1) % SynthState::WaveformBufferSize;
                     } else if (!voice.env.isActive()) {
-                        // Si l'enveloppe est terminée, marquer la voix comme inactive
                         voice.active = false;
                     }
                 } else {
-                    // Si l'enveloppe n'est plus active, marquer la voix comme inactive
                     voice.active = false;
                 }
             }
+
+            voiceIndex++; // Avancer à la prochaine voix
         }
 
         // Appliquer le volume global
         mix *= volume;
-        
-        // Limiter le signal pour éviter l'écrêtage
-        if (mix > 1.0f) mix = 1.0f;
-        if (mix < -1.0f) mix = -1.0f;
+
+        // WaveformRenderer
+        state->renderBuffer[state->renderBufferIndex] = mix;
+        state->renderBufferIndex = (state->renderBufferIndex + 1) % SynthState::WaveformBufferSize;
 
         *out++ = mix;  // Canal gauche
         *out++ = mix;  // Canal droit

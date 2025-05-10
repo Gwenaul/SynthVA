@@ -21,11 +21,17 @@ public:
 
 private:
     enum State { ATTACK, DECAY, SUSTAIN, RELEASE, IDLE };
+    // enum State { ANTI_CLICK_IN, ATTACK, DECAY, SUSTAIN, RELEASE, IDLE };
+
     State state;
     float value;
     float sampleRate;
     float attackTime, decayTime, sustainLevel, releaseTime;
     float attackRate, decayRate, releaseRate;
-    
+
+    float antiClickTime = 0.002f; // 2ms par défaut
+    float antiClickRate;
+    float antiClickTarget;
+
     void calculateRates();
 };

@@ -11,6 +11,10 @@ T clamp(T value, T low, T high) {
     return value;
 }
 
+// Déclaration externe au lieu de définition
+// Cette ligne indique que midiLooper existe ailleurs (dans le main.cpp)
+extern MidiLooper midiLooper;
+
 void midiCallback(double deltatime, std::vector<unsigned char> *message, void *userData) {
     SynthState* state = static_cast<SynthState*>(userData);
 
@@ -21,41 +25,53 @@ void midiCallback(double deltatime, std::vector<unsigned char> *message, void *u
 
         // Vérifier que c'est un Control Change (status 0xB0 à 0xBF)
         if ((status & 0xF0) == 0xB0) {
-            // std::cout << "MIDI CC#" << (int)control << " = " << (int)value << std::endl;
-
+            //pour capter les commandes transport
+            midiLooper.processMidiMessage(*message);
             // Mapping :
-            // Affichage cohérent et lisible pour les contrôles MIDI
             if (control == 1) { // Cutoff
+                // Calculer la valeur du cutoff (100 Hz à 20000 Hz)
                 float cutoff = 100.0f + (value / 127.0f) * 19900.0f;
-                state->moogFilter.setCutoff(cutoff);
-                std::cout << "[Cutoff] " << cutoff << " Hz" << std::endl;
+                // Appliquer le cutoff à chaque voix
+                for (auto& voice : state->voices) {
+                    state->currentCutoff = cutoff;
+                    voice.moogFilter.setCutoff(cutoff);
+                }
+                // std::cout << "[Cutoff] " << cutoff << " Hz" << std::endl;
             } else if (control == 2) { // Résonance
+                // Calculer la résonance (0 à 4)
                 float res = (value / 127.0f) * 4.0f;
-                state->moogFilter.setResonance(res);
-                std::cout << "[Resonance] " << res << std::endl;
+
+                // Appliquer la résonance à chaque voix
+                for (auto& voice : state->voices) {
+                    state->currentResonance = res;
+                    voice.moogFilter.setResonance(res);
+                }
+                // std::cout << "[Resonance] " << res << std::endl;
             } else if (control == 3) { // LFO depth
-                state->lfoDepth = clamp(value / 127.0f, 0.0f, 1.0f) * 100.0f;
-                std::cout << "[LFO Depth] " << state->lfoDepth << "%" << std::endl;
+                state->lfoEnabled = (value >= 4);
+                // std::cout << "[LFO] " << (state->lfoEnabled ? "Enabled" : "Disabled") << std::endl;
+                state->lfoDepth = clamp(value / 127.0f, 0.0f, 1.0f) * 50.0f;
+                // std::cout << "[LFO Depth] " << state->lfoDepth << "%" << std::endl;
             } else if (control == 4) { // LFO Frequency
                 float freq = 0.1f + (value / 127.0f) * 20.0f;
                 state->lfoFrequency = freq;
                 state->lfo.setFrequency(freq);
-                std::cout << "[LFO Frequency] " << freq << " Hz" << std::endl;
+                // std::cout << "[LFO Frequency] " << freq << " Hz" << std::endl;
             } else if (control == 6) { // Volume
                 state->volume = clamp(value / 127.0f, 0.0f, 1.0f);
-                std::cout << "[Volume] " << (state->volume * 100.0f) << "%" << std::endl;
+                // std::cout << "[Volume] " << (state->volume * 100.0f) << "%" << std::endl;
             } else if (control == 7) { // Saw mix
                 state->mixSaw = clamp(value / 127.0f, 0.0f, 1.0f);
-                std::cout << "[Osc Mix] Saw: " << state->mixSaw << std::endl;
+                // std::cout << "[Osc Mix] Saw: " << state->mixSaw << std::endl;
             } else if (control == 8) { // Square mix
                 state->mixSquare = clamp(value / 127.0f, 0.0f, 1.0f);
-                std::cout << "[Osc Mix] Square: " << state->mixSquare << std::endl;
+                // std::cout << "[Osc Mix] Square: " << state->mixSquare << std::endl;
             } else if (control == 9) { // Triangle mix
                 state->mixTriangle = clamp(value / 127.0f, 0.0f, 1.0f);
-                std::cout << "[Osc Mix] Triangle: " << state->mixTriangle << std::endl;
+                // std::cout << "[Osc Mix] Triangle: " << state->mixTriangle << std::endl;
             } else if (control == 10) { // Noise mix
                 state->mixNoise = clamp(value / 127.0f, 0.0f, 1.0f);
-                std::cout << "[Osc Mix] Noise: " << state->mixNoise << std::endl;
+                // std::cout << "[Osc Mix] Noise: " << state->mixNoise << std::endl;
             } else if (control == 11) { // Attack
                 // Convertir la valeur MIDI en secondes (0-127 -> 0.001-2.0 secondes)
                 float attackTime = 0.001f + (value / 127.0f) * 1.999f;
@@ -67,7 +83,7 @@ void midiCallback(double deltatime, std::vector<unsigned char> *message, void *u
                 for (auto& voice : state->voices) {
                     voice.env.setAttack(attackTime);
                 }
-                std::cout << "[Envelope] Attack: " << attackTime << " sec" << std::endl;
+                // std::cout << "[Envelope] Attack: " << attackTime << " sec" << std::endl;
             } else if (control == 12) { // Decay
                 // Convertir la valeur MIDI en secondes (0-127 -> 0.001-3.0 secondes)
                 float decayTime = 0.001f + (value / 127.0f) * 2.999f;
@@ -79,7 +95,7 @@ void midiCallback(double deltatime, std::vector<unsigned char> *message, void *u
                 for (auto& voice : state->voices) {
                     voice.env.setDecay(decayTime);
                 }
-                std::cout << "[Envelope] Decay: " << decayTime << " sec" << std::endl;
+                // std::cout << "[Envelope] Decay: " << decayTime << " sec" << std::endl;
             } else if (control == 13) { // Sustain
                 // Convertir la valeur MIDI en niveau (0-127 -> 0.0-1.0)
                 float sustainLevel = value / 127.0f;
@@ -91,7 +107,7 @@ void midiCallback(double deltatime, std::vector<unsigned char> *message, void *u
                 for (auto& voice : state->voices) {
                     voice.env.setSustain(sustainLevel);
                 }
-                std::cout << "[Envelope] Sustain: " << sustainLevel << std::endl;
+                // std::cout << "[Envelope] Sustain: " << sustainLevel << std::endl;
             } else if (control == 14) { // Release
                 // Convertir la valeur MIDI en secondes (0-127 -> 0.001-5.0 secondes)
                 float releaseTime = 0.001f + (value / 127.0f) * 4.999f;
@@ -103,25 +119,34 @@ void midiCallback(double deltatime, std::vector<unsigned char> *message, void *u
                 for (auto& voice : state->voices) {
                     voice.env.setRelease(releaseTime);
                 }
-                std::cout << "[Envelope] Release: " << releaseTime << " sec" << std::endl;
+                // std::cout << "[Envelope] Release: " << releaseTime << " sec" << std::endl;
             } else if (control == 5) { // LFO Enable/Disable
-                state->lfoEnabled = (value >= 64);
-                std::cout << "[LFO] " << (state->lfoEnabled ? "Enabled" : "Disabled") << std::endl;
-            }
-            
+                for (auto& voice : state->voices) {
+                    if (value < 33) {
+                        voice.setNoiseType(NoiseOscillator::NoiseType::PINK);
+                    } else if (value >= 33 && value < 66) {
+                        voice.setNoiseType(NoiseOscillator::NoiseType::WHITE);
+                    } else if (value >= 66) {
+                        voice.setNoiseType(NoiseOscillator::NoiseType::BROWN);
+                    }
+                }
+            }            
         }
 
         if ((status & 0xF0) == 0x90 && value > 0) {  // Note On
             int note = control;
             float freq = 440.0f * pow(2.0f, (note - 69) / 12.0f); // MIDI note to frequency
 
+            midiLooper.processMidiMessage(*message);
+
             // Vérifier si une voix joue déjà cette note
             bool found = false;
             for (auto& voice : state->voices) {
                 if (voice.active && voice.freq == freq) {
                     voice.env.noteOn(); // retrigger env
+                    midiLooper.processMidiMessage(*message);
                     found = true;
-                    std::cout << "Retriggering existing voice for Note: " << note << std::endl;
+                    // std::cout << "Retriggering existing voice for Note: " << note << std::endl;
                     break;
                 }
             }
@@ -138,42 +163,53 @@ void midiCallback(double deltatime, std::vector<unsigned char> *message, void *u
                             break;
                         }
                     }
-                    
+
                     // Si toutes les voix sont actives, on remplace simplement la première
                     if (oldestVoiceIndex == -1) oldestVoiceIndex = 0;
-                    
+
                     // Réutiliser cette voix
-                    state->voices[oldestVoiceIndex].freq = freq;
-                    state->voices[oldestVoiceIndex].active = true;
-                    state->voices[oldestVoiceIndex].env.noteOn();
+                    auto& reusedVoice = state->voices[oldestVoiceIndex];
+                    reusedVoice.freq = freq;
+                    reusedVoice.active = true;
+
+                    // Appliquer les bons paramètres ADSR
+                    reusedVoice.env.setAttack(state->attackTime);
+                    reusedVoice.env.setDecay(state->decayTime);
+                    reusedVoice.env.setSustain(state->sustainLevel);
+                    reusedVoice.env.setRelease(state->releaseTime);
+
+                    reusedVoice.env.noteOn();
                 } else {
                     // Créer une nouvelle voix
                     Voice voice(state->sampleRate);
-                    
+
                     // Appliquer les paramètres ADSR actuels
                     voice.env.setAttack(state->attackTime);
                     voice.env.setDecay(state->decayTime);
                     voice.env.setSustain(state->sustainLevel);
                     voice.env.setRelease(state->releaseTime);
-                    
+
                     voice.freq = freq;
                     voice.active = true;
                     voice.env.noteOn();
                     state->voices.push_back(voice);
                 }
             }
-
             std::cout << "Note On: " << note << " -> " << freq << " Hz" << std::endl;
         }
 
         else if ((status & 0xF0) == 0x80 || ((status & 0xF0) == 0x90 && value == 0)) {  // Note Off
             int note = control;
             float freq = 440.0f * pow(2.0f, (note - 69) / 12.0f);
+
+            midiLooper.processMidiMessage(*message);
+
             state->noteOn = false;
             
             // Trouver et relâcher la voix correspondante
             for (auto& voice : state->voices) {
                 if (voice.active && voice.freq == freq) {
+
                     voice.env.noteOff();
                     break;
                 }
@@ -182,4 +218,20 @@ void midiCallback(double deltatime, std::vector<unsigned char> *message, void *u
             std::cout << "Note Off: " << note << std::endl;
         }
     }
+}
+
+void setupMidiLooper(SynthState* state) {
+    midiLooper.setSendCallback([state](const std::vector<unsigned char>& message) {
+        // Affiche un message lorsque un message MIDI est envoyé
+        std::cout << "[Looper] Sending MIDI message: ";
+        for (unsigned char byte : message) {
+            std::cout << (int)byte << " ";
+        }
+        std::cout << std::endl;
+
+        // Réinjecte dans le synthé, comme si on recevait le message en temps réel
+        midiCallback(0.0, const_cast<std::vector<unsigned char>*>(&message), state);
+    });
+
+    std::cout << "[Looper] MidiLooper setup complete. Ready to send MIDI messages." << std::endl;
 }
