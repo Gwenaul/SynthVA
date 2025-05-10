@@ -15,6 +15,12 @@ T clamp(T value, T low, T high) {
 // Cette ligne indique que midiLooper existe ailleurs (dans le main.cpp)
 extern MidiLooper midiLooper;
 
+float computeEffectiveResonance(float userRes, float cutoff) {
+    float normCutoff = clamp((cutoff - 100.0f) / (20000.0f - 100.0f), 0.0f, 1.0f);
+    float adjustedRes = userRes * (1.2f - normCutoff);
+    return clamp(adjustedRes, 0.0f, 4.0f);
+}
+
 void midiCallback(double deltatime, std::vector<unsigned char> *message, void *userData) {
     SynthState* state = static_cast<SynthState*>(userData);
 
@@ -30,25 +36,27 @@ void midiCallback(double deltatime, std::vector<unsigned char> *message, void *u
             midiLooper.processMidiMessage(*message);
 
             // Mapping :
-            if (control == 1) { // Cutoff
-                // Calculer la valeur du cutoff (100 Hz à 20000 Hz)
-                float cutoff = 100.0f + (value / 127.0f) * 19900.0f;
-                // Appliquer le cutoff à chaque voix
-                for (auto& voice : state->voices) {
-                    state->currentCutoff = cutoff;
-                    voice.moogFilter.setCutoff(cutoff);
-                }
-                // std::cout << "[Cutoff] " << cutoff << " Hz" << std::endl;
-            } else if (control == 2) { // Résonance
-                // Calculer la résonance (0 à 4)
-                float res = (value / 127.0f) * 4.0f;
+            if (control == 1) {
+                float cutoff = 100.0f * std::pow(200.0f, value / 127.0f);
+                state->currentCutoff = cutoff;
 
-                // Appliquer la résonance à chaque voix
+                float adjustedRes = computeEffectiveResonance(state->userResonance, cutoff);
+                state->currentResonance = adjustedRes;
+
                 for (auto& voice : state->voices) {
-                    state->currentResonance = res;
-                    voice.moogFilter.setResonance(res);
+                    voice.moogFilter.setCutoff(cutoff);
+                    voice.moogFilter.setResonance(adjustedRes);
                 }
-                // std::cout << "[Resonance] " << res << std::endl;
+            } else if (control == 2) {
+                float rawRes = (value / 127.0f) * 4.0f;
+                state->userResonance = rawRes;
+
+                float adjustedRes = computeEffectiveResonance(rawRes, state->currentCutoff);
+                state->currentResonance = adjustedRes;
+
+                for (auto& voice : state->voices) {
+                    voice.moogFilter.setResonance(adjustedRes);
+                }
             } else if (control == 3) { // LFO depth
                 state->lfoEnabled = (value >= 4);
                 // std::cout << "[LFO] " << (state->lfoEnabled ? "Enabled" : "Disabled") << std::endl;

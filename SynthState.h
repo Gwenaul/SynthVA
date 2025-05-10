@@ -65,6 +65,8 @@ struct SynthState {
 
     float renderBuffers[6][WaveformBufferSize] = {{0.0f}}; // un buffer par voix
     int renderBufferIndices[6] = {0}; // un index par voix
+
+    float userResonance = 0.0f; // stocke la valeur brute envoyée par le contrôleur
         
     // Constructeur
     SynthState(float sampleRate)
