@@ -303,6 +303,13 @@ void renderUI(SDL_Renderer* renderer, TTF_Font* font, SynthState& state) {
     // Afficher la fréquence active
     for (auto& voice : state.voices) {
         if (voice.active) {
+            for (int i = 0; i < 6; ++i) {
+                renderWaveformPeriod(renderer, state.renderBuffers[i], SynthState::WaveformBufferSize,
+                                    state.renderBufferIndices[i], 470 + offsetX, 400 + offsetY, 400, 300, verticalScale, i);
+                offsetX += 10;  // Décale chaque voix en X
+                offsetY -= 10;  // Décale chaque voix en Y
+            }
+
             std::ostringstream noteStr;
             noteStr << "Freq: " << voice.freq << " Hz";
             renderText(renderer, font, noteStr.str(), 10, 40);
@@ -310,7 +317,7 @@ void renderUI(SDL_Renderer* renderer, TTF_Font* font, SynthState& state) {
             // Affichage de la jauge de filtre
             float normCutoff = voice.moogFilter.getCutoff() / 20000.0f;
             std::ostringstream cutoffStr;
-            cutoffStr << "Cutoff:       " << createGauge(normCutoff, 20)
+            cutoffStr << "Cutoff:    " << createGauge(normCutoff, 20)
                     // << " " << static_cast<int>(normCutoff) << " Hz"
                     ;
             renderText(renderer, font, cutoffStr.str(), 10, 320);
@@ -318,7 +325,7 @@ void renderUI(SDL_Renderer* renderer, TTF_Font* font, SynthState& state) {
             // Jauge pour résonance
             float normResonance = voice.moogFilter.getResonance() / 4.0f;
             std::ostringstream resonanceStr;
-            resonanceStr << "Resonance:    " << createGauge(normResonance, 20)
+            resonanceStr << "Resonance: " << createGauge(normResonance, 20)
                         // << " " << static_cast<int>(normResonance * 100) << "%"
                         ;
             renderText(renderer, font, resonanceStr.str(), 10, 350);
@@ -326,7 +333,7 @@ void renderUI(SDL_Renderer* renderer, TTF_Font* font, SynthState& state) {
             // Jauge pour lfoDepth
             float normlfoDepth = state.lfoDepth / 100.0f;
             std::ostringstream lfoDepthStr;
-            lfoDepthStr << "lfoDepth:     " << createGauge(normlfoDepth, 20)
+            lfoDepthStr << "lfoDepth:    " << createGauge(normlfoDepth, 20)
                         // << " " << static_cast<int>(state.lfoDepth) << " %"
                         ;
             renderText(renderer, font, lfoDepthStr.str(), 10, 380);// x, y
@@ -339,32 +346,31 @@ void renderUI(SDL_Renderer* renderer, TTF_Font* font, SynthState& state) {
                         ;
             renderText(renderer, font, lfoFrequencyStr.str(), 10, 410);// x, y
 
-            renderWaveform(renderer, state.renderBuffer, SynthState::WaveformBufferSize, state.renderBufferIndex, 10, 130, 760, 200, verticalScale);// x, y, width, height        
-            for (int i = 0; i < 6; ++i) {
-                renderWaveformPeriod(renderer, state.renderBuffers[i], SynthState::WaveformBufferSize,
-                                    state.renderBufferIndices[i], 450 + offsetX, 400 + offsetY, 400, 300, verticalScale, i);
-                offsetX += 10;  // Décale chaque voix en X
-                offsetY -= 10;  // Décale chaque voix en Y
-            }
-
+            renderWaveform(renderer, state.renderBuffer, SynthState::WaveformBufferSize, state.renderBufferIndex, 10, 150, 760, 200, verticalScale);// x, y, width, height        
             int x = 790;  // Position X de départ (ajuster selon la largeur de fenêtre)
             int baseY = 200;  // Position Y de départ (bas de la fenêtre)
+
             // SAW
             renderText(renderer, font, "Saw", x, baseY);// x, y
             renderText(renderer, font, createFramedGauge(state.mixSaw), x + 40, baseY);// x, y
+
             // SQUARE
             renderText(renderer, font, "Sq", x, baseY + 20);// x, y
             renderText(renderer, font, createFramedGauge(state.mixSquare), x + 40, baseY + 20);// x, y
+
             // TRIANGLE
             renderText(renderer, font, "Tri", x, baseY + 40);// x, y
             renderText(renderer, font, createFramedGauge(state.mixTriangle), x + 40, baseY + 40);// x, y
+
             // NOISE
             renderText(renderer, font, "N", x, baseY + 60);// x, y
             renderText(renderer, font, createFramedGauge(state.mixNoise), x + 40, baseY + 60);// x, y
+
             renderText(renderer, font, createFramedGaugeWithLevel(state.mixSaw), x + 40, baseY);// x, y
             renderText(renderer, font, createFramedGaugeWithLevel(state.mixSquare), x + 40, baseY + 20);// x, y
             renderText(renderer, font, createFramedGaugeWithLevel(state.mixTriangle), x + 40, baseY + 40);// x, y
-            renderText(renderer, font, createFramedGaugeWithLevel(state.mixNoise), x + 40, baseY + 60);// x, y    
+            renderText(renderer, font, createFramedGaugeWithLevel(state.mixNoise), x + 40, baseY + 60);// x, y
+                
             break;
         }
     }

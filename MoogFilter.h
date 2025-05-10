@@ -21,7 +21,6 @@ public:
         if (resonance < 0.0f) resonance = 0.0f;
         if (resonance > 4.0f) resonance = 4.0f;
 
-        // resonance = std::clamp(resonance, 0.0f, 4.0f); // C++17
         res = resonance;
     }
 

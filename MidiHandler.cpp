@@ -25,8 +25,10 @@ void midiCallback(double deltatime, std::vector<unsigned char> *message, void *u
 
         // Vérifier que c'est un Control Change (status 0xB0 à 0xBF)
         if ((status & 0xF0) == 0xB0) {
+
             //pour capter les commandes transport
             midiLooper.processMidiMessage(*message);
+
             // Mapping :
             if (control == 1) { // Cutoff
                 // Calculer la valeur du cutoff (100 Hz à 20000 Hz)
@@ -144,7 +146,7 @@ void midiCallback(double deltatime, std::vector<unsigned char> *message, void *u
             for (auto& voice : state->voices) {
                 if (voice.active && voice.freq == freq) {
                     voice.env.noteOn(); // retrigger env
-                    midiLooper.processMidiMessage(*message);
+
                     found = true;
                     // std::cout << "Retriggering existing voice for Note: " << note << std::endl;
                     break;
