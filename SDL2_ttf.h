@@ -215,47 +215,60 @@ std::string createFramedGaugeWithLevel(float value) {
 
     return gauge;
 }
-
 void renderADSR(SDL_Renderer* renderer, TTF_Font* font, SynthState& state, int x, int y, int width, int height) {
     bool foundVoice = false;
-    
+
+    float a = 0.0f, d = 0.0f, s = 0.0f, r = 0.0f;
+
     for (auto& voice : state.voices) {
         if (voice.active) {
-            a = voice.env.getAttack();
-            d = voice.env.getDecay();
-            s = voice.env.getSustain();
-            r = voice.env.getRelease();
+            switch (state.oscControlGroup) {
+                case 2: // Filter envelope
+                    a = voice.filterEnv.getAttack();
+                    d = voice.filterEnv.getDecay();
+                    s = voice.filterEnv.getSustain();
+                    r = voice.filterEnv.getRelease();
+                    SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Rouge
+                    break;
+                case 3: // Pitch envelope
+                    a = voice.lfoDepthEnv.getAttack();
+                    d = voice.lfoDepthEnv.getDecay();
+                    s = voice.lfoDepthEnv.getSustain();
+                    r = voice.lfoDepthEnv.getRelease();
+                    SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Bleu
+                    break;
+                default: // Volume envelope (cas 0 ou 1)
+                    a = voice.env.getAttack();
+                    d = voice.env.getDecay();
+                    s = voice.env.getSustain();
+                    r = voice.env.getRelease();
+                    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255); // Vert
+                    break;
+            }
             foundVoice = true;
             break;
         }
     }
 
-    if (!foundVoice) {
-        return;
-    }
+    if (!foundVoice) return;
 
-    // Total duration for scaling x (arbitrary sustain duration)
-    float sustainDuration = 0.2f; // Fixed value for drawing
+    float sustainDuration = 0.2f;
     float totalTime = a + d + sustainDuration + r;
 
-    // Points de temps
     float t0 = 0;
     float t1 = t0 + a;
     float t2 = t1 + d;
     float t3 = t2 + sustainDuration;
     float t4 = t3 + r;
 
-    // Normaliser le temps pour l'adapter à la largeur de l'écran
     auto timeToX = [&](float t) -> int {
         return x + static_cast<int>((t / totalTime) * width);
     };
 
-    // Convertir les niveaux en Y pour l'affichage
     auto levelToY = [&](float level) -> int {
         return y + static_cast<int>((1.0f - level) * height);
     };
 
-    // Points pour dessiner la courbe ADSR
     SDL_Point points[5];
     points[0] = {timeToX(t0), levelToY(0.0f)};
     points[1] = {timeToX(t1), levelToY(1.0f)};
@@ -263,22 +276,20 @@ void renderADSR(SDL_Renderer* renderer, TTF_Font* font, SynthState& state, int x
     points[3] = {timeToX(t3), levelToY(s)};
     points[4] = {timeToX(t4), levelToY(0.0f)};
 
-    // Dessiner la courbe ADSR en vert
-    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255); // Vert
     SDL_RenderDrawLines(renderer, points, 5);
-    
-    // // Affichage des jauges ADSR
+
+    // === Affichage des jauges ADSR ===
     renderText(renderer, font, "A", 790, 130);
-    renderText(renderer, font, createSingleBlockGauge(a / 2.0f), 790, 110);// x, y
+    renderText(renderer, font, createSingleBlockGauge(a / 2.0f), 790, 110);
 
     renderText(renderer, font, "D", 810, 130);
-    renderText(renderer, font, createSingleBlockGauge(d / 3.0f), 810, 110);// x, y
+    renderText(renderer, font, createSingleBlockGauge(d / 3.0f), 810, 110);
 
     renderText(renderer, font, "S", 830, 130);
-    renderText(renderer, font, createSingleBlockGauge(s / 1.0f), 830, 110);// x, y
+    renderText(renderer, font, createSingleBlockGauge(s / 1.0f), 830, 110);
 
     renderText(renderer, font, "R", 850, 130);
-    renderText(renderer, font, createSingleBlockGauge(r / 5.0f), 850, 110);// x, y
+    renderText(renderer, font, createSingleBlockGauge(r / 5.0f), 850, 110);
 }
 
 void renderUI(SDL_Renderer* renderer, TTF_Font* font, SynthState& state) {
@@ -288,15 +299,26 @@ void renderUI(SDL_Renderer* renderer, TTF_Font* font, SynthState& state) {
     // Afficher le nom de la forme d'onde
     std::string waveformStr;
     switch (*state.waveform) {
-        case Waveform::Saw: waveformStr = "Saw"; break;
-        case Waveform::Square: waveformStr = "Square"; break;
-        case Waveform::Triangle: waveformStr = "Triangle"; break;
-        case Waveform::Noise: waveformStr = "Noise"; break;
+        case Waveform::Saw:       waveformStr = "Saw"; break;
+        case Waveform::Square:    waveformStr = "Square"; break;
+        case Waveform::Triangle:  waveformStr = "Triangle"; break;
+        case Waveform::Noise:     waveformStr = "Noise"; break;
+        case Waveform::Pulse:     waveformStr = "Pulse"; break;
+        case Waveform::RampDown:  waveformStr = "RampDown"; break;
+        case Waveform::SubOsc:    waveformStr = "SubOsc"; break;
+        case Waveform::FilteredNoise: waveformStr = "FiltNoise"; break;
+        case Waveform::DoubleSaw: waveformStr = "DoubleSaw"; break;
     }
 
     std::ostringstream oss;
     oss << "Waveform: " << waveformStr;
     renderText(renderer, font, oss.str(), 10, 10);
+    
+    // // Afficher le groupe de contrôle actif
+    // std::ostringstream groupStr;
+    // groupStr << "Control Group: " << (state.oscControlGroup == 0 ? "OSC Mix" : "ADSR/LFO");
+    // renderText(renderer, font, groupStr.str(), 200, 10);
+    
     int offsetX = 0;
     int offsetY = 0;
 
@@ -317,60 +339,105 @@ void renderUI(SDL_Renderer* renderer, TTF_Font* font, SynthState& state) {
             // Affichage de la jauge de filtre
             float normCutoff = voice.moogFilter.getCutoff() / 20000.0f;
             std::ostringstream cutoffStr;
-            cutoffStr << "Cutoff:    " << createGauge(normCutoff, 20)
-                    // << " " << static_cast<int>(normCutoff) << " Hz"
-                    ;
+            cutoffStr << "Cutoff:       " << createGauge(normCutoff, 20);
             renderText(renderer, font, cutoffStr.str(), 10, 320);
 
             // Jauge pour résonance
             float normResonance = voice.moogFilter.getResonance() / 4.0f;
             std::ostringstream resonanceStr;
-            resonanceStr << "Resonance: " << createGauge(normResonance, 20)
-                        // << " " << static_cast<int>(normResonance * 100) << "%"
-                        ;
+            resonanceStr << "Resonance:    " << createGauge(normResonance, 20);
             renderText(renderer, font, resonanceStr.str(), 10, 350);
 
             // Jauge pour lfoDepth
-            float normlfoDepth = state.lfoDepth / 100.0f;
+            float normlfoDepth = state.lfoGlobalDepth;
             std::ostringstream lfoDepthStr;
-            lfoDepthStr << "lfoDepth:    " << createGauge(normlfoDepth, 20)
-                        // << " " << static_cast<int>(state.lfoDepth) << " %"
-                        ;
-            renderText(renderer, font, lfoDepthStr.str(), 10, 380);// x, y
+            lfoDepthStr << "lfoDepth:     " << createGauge(normlfoDepth, 20);
+            renderText(renderer, font, lfoDepthStr.str(), 10, 380);
 
             // Jauge pour lfoFrequency
             float normlfoFrequency = state.lfoFrequency / 20.0f;
             std::ostringstream lfoFrequencyStr;
-            lfoFrequencyStr << "lfoFrequency: " << createGauge(normlfoFrequency, 20)
-                        // << " " << static_cast<int>(normlfoFrequency) << "Hz"
-                        ;
-            renderText(renderer, font, lfoFrequencyStr.str(), 10, 410);// x, y
+            lfoFrequencyStr << "lfoFrequency: " << createGauge(normlfoFrequency, 20);
+            renderText(renderer, font, lfoFrequencyStr.str(), 10, 410);
 
-            renderWaveform(renderer, state.renderBuffer, SynthState::WaveformBufferSize, state.renderBufferIndex, 10, 150, 760, 200, verticalScale);// x, y, width, height        
-            int x = 790;  // Position X de départ (ajuster selon la largeur de fenêtre)
-            int baseY = 200;  // Position Y de départ (bas de la fenêtre)
+            renderWaveform(renderer, state.renderBuffer, SynthState::WaveformBufferSize, state.renderBufferIndex, 10, 150, 660, 200, verticalScale);
+            
+            int x = 690;
+            int xLeft = x;
+            int xRight = xLeft + 110;
+            int xMiddle = 20;
+            int lineHeight = 25;
+            int baseY = 300;
 
-            // SAW
-            renderText(renderer, font, "Saw", x, baseY);// x, y
-            renderText(renderer, font, createFramedGauge(state.mixSaw), x + 40, baseY);// x, y
+            // === Affichage des modulations LFO ===
+            int lfoX = x;
+            int lfoY = baseY - lineHeight * 5;
 
-            // SQUARE
-            renderText(renderer, font, "Sq", x, baseY + 20);// x, y
-            renderText(renderer, font, createFramedGauge(state.mixSquare), x + 40, baseY + 20);// x, y
+            renderText(renderer, font, "LFO Cut", lfoX, lfoY);
+            renderText(renderer, font, createFramedGaugeWithLevel(state.lfoDepthCutoff), lfoX + 30, lfoY);
 
-            // TRIANGLE
-            renderText(renderer, font, "Tri", x, baseY + 40);// x, y
-            renderText(renderer, font, createFramedGauge(state.mixTriangle), x + 40, baseY + 40);// x, y
+            renderText(renderer, font, "LFO Pitch", lfoX, lfoY + lineHeight);
+            renderText(renderer, font, createFramedGaugeWithLevel(state.lfoDepthPitch), lfoX + 30, lfoY + lineHeight);
 
-            // NOISE
-            renderText(renderer, font, "N", x, baseY + 60);// x, y
-            renderText(renderer, font, createFramedGauge(state.mixNoise), x + 40, baseY + 60);// x, y
+            renderText(renderer, font, "LFO Pulse", xRight, lfoY + lineHeight);
+            renderText(renderer, font, createFramedGaugeWithLevel(state.pulseWidthDepth), xRight + 30, lfoY + lineHeight);
 
-            renderText(renderer, font, createFramedGaugeWithLevel(state.mixSaw), x + 40, baseY);// x, y
-            renderText(renderer, font, createFramedGaugeWithLevel(state.mixSquare), x + 40, baseY + 20);// x, y
-            renderText(renderer, font, createFramedGaugeWithLevel(state.mixTriangle), x + 40, baseY + 40);// x, y
-            renderText(renderer, font, createFramedGaugeWithLevel(state.mixNoise), x + 40, baseY + 60);// x, y
+            // === Affichage des réglages OSC (Groupe 0) ===
+            renderText(renderer, font, "Saw", xLeft, baseY + lineHeight);
+            renderText(renderer, font, "DSaw", xRight, baseY + lineHeight);
+            renderText(renderer, font, createFramedGaugeWithLevel(state.mixSaw), xLeft + 30, baseY + lineHeight);
+            renderText(renderer, font, createFramedGaugeWithLevel(state.mixDoubleSaw), xRight + 30, baseY + lineHeight);
+
+            renderText(renderer, font, "Tri", xLeft, baseY);
+            renderText(renderer, font, "Sq", xRight, baseY);
+            renderText(renderer, font, createFramedGaugeWithLevel(state.mixTriangle), xLeft + 30, baseY);
+            renderText(renderer, font, createFramedGaugeWithLevel(state.mixSquare), xRight + 30, baseY);
+
+            renderText(renderer, font, "Pulse", xLeft, baseY - lineHeight);
+            renderText(renderer, font, "Ramp", xRight, baseY - lineHeight);
+            renderText(renderer, font, createFramedGaugeWithLevel(state.mixPulse), xLeft + 30, baseY - lineHeight);
+            renderText(renderer, font, createFramedGaugeWithLevel(state.mixRampDown), xRight + 30, baseY - lineHeight);
+
+            renderText(renderer, font, "Sub", xLeft, baseY - lineHeight * 2);
+            renderText(renderer, font, "Noise", xRight, baseY - lineHeight * 2);
+            renderText(renderer, font, createFramedGaugeWithLevel(state.mixSub), xLeft + 30, baseY - lineHeight * 2);
+            renderText(renderer, font, createFramedGaugeWithLevel(state.mixNoise), xRight + 30, baseY - lineHeight * 2);
+
+            // === CADRES DYNAMIQUES selon le groupe actif ===
+            SDL_SetRenderDrawColor(renderer, 100, 100, 255, 255); // Cadre bleu/violet
+
+            if (state.oscControlGroup == 0) {
+                // Cadre autour des réglages OSC (groupe 0)
+                SDL_Rect oscMixRect;
+                oscMixRect.x = xLeft - 10;
+                oscMixRect.y = baseY - lineHeight * 2 - 10;
+                oscMixRect.w = (xRight + 110) - oscMixRect.x;
+                oscMixRect.h = lineHeight * 4 + 20;
+                SDL_RenderDrawRect(renderer, &oscMixRect);
                 
+                // Titre du groupe actif
+                renderText(renderer, font, "[OSC MIX]", xLeft, baseY - lineHeight * 3);
+            } else if (state.oscControlGroup == 1) {
+                // Cadre autour des réglages ADSR/LFO (groupe 1)
+                SDL_Rect adsrLfoRect;
+                adsrLfoRect.x = lfoX - 10;
+                adsrLfoRect.y = lfoY - 10;
+                adsrLfoRect.w = (xRight + 110) - adsrLfoRect.x;
+                adsrLfoRect.h = lineHeight * 2 + 20;
+                SDL_RenderDrawRect(renderer, &adsrLfoRect);
+                
+                // Cadre pour les réglages ADSR (dans la zone ADSR existante)
+                SDL_Rect adsrRect;
+                adsrRect.x = 785;  // Position des réglages ADSR
+                adsrRect.y = 105;
+                adsrRect.w = 85;   // Largeur pour englober A,D,S,R
+                adsrRect.h = 50;
+                SDL_RenderDrawRect(renderer, &adsrRect);
+                
+                // Titre du groupe actif
+                renderText(renderer, font, "[ADSR/LFO]", lfoX, lfoY - lineHeight);
+            }
+
             break;
         }
     }
@@ -378,12 +445,13 @@ void renderUI(SDL_Renderer* renderer, TTF_Font* font, SynthState& state) {
     // Volume
     std::ostringstream volStr;
     volStr << "Volume: " << static_cast<int>(state.volume * 100) << "%";
-    renderText(renderer, font, volStr.str(), 790, 70);// x, y
-    renderText(renderer, font, createVerticalBlockGauge(state.volume), 790, 40); // x, y
+    renderText(renderer, font, volStr.str(), 790, 70);
+    renderText(renderer, font, createVerticalBlockGauge(state.volume), 790, 40);
 
-    renderText(renderer, font, "Press ESC to quit", 10, 110);// x, y
+    renderText(renderer, font, "Press ESC to quit", 10, 110);
+    renderText(renderer, font, "CC115/116: Switch Groups", 10, 70);
     
-    renderADSR(renderer, font, state, 300, 20, 400, 100);  // x, y, width, height
+    renderADSR(renderer, font, state, 300, 20, 400, 100);
 
     SDL_RenderPresent(renderer);
 }

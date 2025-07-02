@@ -9,6 +9,11 @@
 #include "PolyBLEP_Square.h"
 #include "PolyBLEP_Triangle.h"
 #include "NoiseOscillator.h"
+#include "PolyBLEP_DoubleSaw.h"
+#include "PolyBLEP_FilteredNoise.h"
+#include "PolyBLEP_Pulse.h"
+#include "PolyBLEP_RampDown.h"
+#include "PolyBLEP_SubOsc.h"
 #include "MoogFilter.h"
 #include "KeyMapping.h"
 #include "Waveform.h"
@@ -23,22 +28,46 @@
 #include "MidiLooper.h"
 
 // Définition globale de midiLooper
-// C'est la seule définition de cette variable dans tout le programme
 MidiLooper midiLooper;
 
 void midiCallback(double deltatime, std::vector<unsigned char> *message, void *userData);
 void setupMidiLooper(SynthState* state);
+void listMidiInputPorts() {
+    try {
+        RtMidiIn midiIn;
+
+        unsigned int nPorts = midiIn.getPortCount();
+        std::cout << "Nombre de ports MIDI d'entrée disponibles : " << nPorts << std::endl;
+
+        for (unsigned int i = 0; i < nPorts; ++i) {
+            std::string portName = midiIn.getPortName(i);
+            std::cout << "Port MIDI " << i << ": " << portName << std::endl;
+        }
+    }
+    catch (RtMidiError &error) {
+        error.printMessage();
+    }
+}
 
 int main() {
+    listMidiInputPorts();
     float sampleRate = 44100.0f;
-    SynthState state(sampleRate); // Seul constructeur utilisé
+    SynthState state(sampleRate);
 
     // Objets partagés
     PolyBLEP_Saw osc(sampleRate);
     PolyBLEP_Square oscSquare(sampleRate);
     PolyBLEP_Triangle oscTriangle(sampleRate);
     NoiseOscillator noiseOsc(sampleRate);
-    Waveform waveform = Waveform::Saw; // forme d'onde par défaut
+
+    // Nouveaux oscillateurs
+    PolyBLEP_DoubleSaw doubleSawOsc(sampleRate);
+    PolyBLEP_FilteredNoise filteredNoiseOsc(sampleRate);
+    PolyBLEP_Pulse pulseOsc(sampleRate);
+    PolyBLEP_RampDown rampDownOsc(sampleRate);
+    PolyBLEP_SubOsc subOsc(sampleRate);
+
+    Waveform waveform = Waveform::Saw;
     float volume = 0.2f;
     int currentOctave = 4;
     bool noteOn = false;
@@ -46,14 +75,13 @@ int main() {
     MoogFilter moogFilter(sampleRate);
     moogFilter.setCutoff(1000.0f);
     moogFilter.setResonance(0.7f);
-    
-    // Créer un objet global ou local selon l'architecture
+
+    // MIDI setup
     RtMidiIn* midiin = new RtMidiIn();
-    
     try {
-        midiin->openPort(1);  // 0 = premier périphérique MIDI détecté
-        midiin->setCallback(&midiCallback, &state); // `state` est un pointeur vers le SynthState
-        midiin->ignoreTypes(false, false, false);   // N'ignore aucun message
+        midiin->openPort(2);
+        midiin->setCallback(&midiCallback, &state);
+        midiin->ignoreTypes(false, false, false);
     } catch (RtMidiError& error) {
         error.printMessage();
         exit(EXIT_FAILURE);
@@ -61,11 +89,18 @@ int main() {
 
     setupMidiLooper(&state);
 
-    // Affectation dans le state
+    // Affectation dans le SynthState
     state.osc = &osc;
     state.oscSquare = &oscSquare;
     state.oscTriangle = &oscTriangle;
     state.noiseOsc = &noiseOsc;
+
+    state.doubleSawOsc = &doubleSawOsc;
+    state.filteredNoiseOsc = &filteredNoiseOsc;
+    state.pulseOsc = &pulseOsc;
+    state.rampDownOsc = &rampDownOsc;
+    state.subOsc = &subOsc;
+
     state.waveform = &waveform;
     state.volume = volume;
     state.octave = currentOctave;
@@ -84,6 +119,35 @@ int main() {
     PaStream* stream;
 
     err = Pa_Initialize();
+    int numDevices = Pa_GetDeviceCount();
+    if (numDevices < 0) {
+        std::cerr << "ERROR: Pa_GetDeviceCount returned " << numDevices << std::endl;
+        std::cerr << "PortAudio error: " << Pa_GetErrorText(numDevices) << std::endl;
+        return 1;
+    }
+
+    const PaDeviceInfo* deviceInfo;
+    const PaHostApiInfo* hostApiInfo;
+
+    std::cout << "Available PortAudio Devices:\n";
+
+    for (int i = 0; i < numDevices; ++i) {
+        deviceInfo = Pa_GetDeviceInfo(i);
+        hostApiInfo = Pa_GetHostApiInfo(deviceInfo->hostApi);
+
+        std::cout << "[" << i << "] "
+                << deviceInfo->name << " ("
+                << hostApiInfo->name << ") - ";
+
+        if (deviceInfo->maxInputChannels > 0)
+            std::cout << "Input: " << deviceInfo->maxInputChannels << " ch ";
+
+        if (deviceInfo->maxOutputChannels > 0)
+            std::cout << "Output: " << deviceInfo->maxOutputChannels << " ch";
+
+        std::cout << std::endl;
+    }
+
     if (err != paNoError) {
         std::cerr << "PortAudio error: " << Pa_GetErrorText(err) << std::endl;
         return 1;
@@ -125,12 +189,10 @@ int main() {
     bool quit = false;
     SDL_Event event;
 
-    // Main loop
     while (!quit) {
         while (SDL_PollEvent(&event)) {
             handleKeyboard(state, event, quit);
         }
-        // Mettre à jour le looper - c'est la seule instance de MidiLooper qui existe
         midiLooper.update();
         renderUI(renderer, font, state);
         SDL_Delay(16); // ~60 FPS

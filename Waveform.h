@@ -6,7 +6,13 @@ enum class Waveform {
     Saw,
     Square,
     Triangle,
-    Noise
+    Noise,
+
+    Pulse,
+    RampDown,     
+    SubOsc,       
+    DoubleSaw,    
+    FilteredNoise
 };
 
 #endif // WAVEFORM_H

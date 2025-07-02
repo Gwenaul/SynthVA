@@ -8,6 +8,8 @@ public:
     void noteOff();
     float process();
     bool isActive() const;
+
+    void reset();
     
     float getAttack() const { return attackTime; }
     void setAttack(float a);
@@ -18,6 +20,8 @@ public:
     float getRelease() const { return releaseTime; }
     void setRelease(float r);
     float getSampleRate() const { return sampleRate; }
+
+    void setADSR(float attack, float decay, float sustain, float release);
 
 private:
     enum State { ATTACK, DECAY, SUSTAIN, RELEASE, IDLE };
